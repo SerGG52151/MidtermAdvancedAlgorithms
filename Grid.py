@@ -3,6 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from collections import defaultdict
 from typing import Dict, List, Tuple, Iterable, Optional, Set
+import warnings
+
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib import colors
+except Exception:  # pragma: no cover - optional plotting
+    plt = None
+    colors = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +94,78 @@ class GridMap:
                 if self.allow_wait:
                     neighbors.append(pos)
                 self.adjacency_list[pos] = neighbors
+
+    def draw(
+        self,
+        starts: Optional[Dict[int, Position]] = None,
+        goals: Optional[Dict[int, Position]] = None,
+        paths: Optional[Dict[int, List[Position]]] = None,
+        figsize: Tuple[int, int] = (6, 6),
+    ) -> None:
+        """Draw the grid, obstacles, starts/goals and optional paths using matplotlib.
+
+        - obstacles are black squares
+        - free cells are white
+        - starts marked with blue circles, goals with green stars
+        - paths drawn with colored lines per agent and annotated with agent id
+        """
+        if plt is None or colors is None:
+            warnings.warn("matplotlib is not available. Install matplotlib to enable drawing.")
+            return
+
+        grid_img = [[0 if Position(r, c) not in self.obstacles else 1 for c in range(self.width)] for r in range(self.height)]
+
+        cmap = colors.ListedColormap(["white", "black"])
+        bounds = [0, 0.5, 1]
+        norm = colors.BoundaryNorm(bounds, cmap.N)
+
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.imshow(grid_img, cmap=cmap, norm=norm)
+
+        # draw grid lines
+        ax.set_xticks([x - 0.5 for x in range(1, self.width)], minor=False)
+        ax.set_yticks([y - 0.5 for y in range(1, self.height)], minor=False)
+        ax.grid(which="major", color="gray", linestyle="-", linewidth=0.5)
+
+        # optional: draw starts and goals
+        if starts:
+            for aid, p in starts.items():
+                ax.plot(p.col, p.row, marker="o", color="blue", markersize=10)
+                ax.text(p.col + 0.1, p.row + 0.1, str(aid), color="white", fontsize=8)
+
+        if goals:
+            for aid, p in goals.items():
+                ax.plot(p.col, p.row, marker="*", color="green", markersize=12)
+
+        # draw paths
+        if paths:
+            import random
+
+            for aid, path in paths.items():
+                cols = [p.col for p in path]
+                rows = [p.row for p in path]
+                color = f"C{aid % 10}"
+                ax.plot(cols, rows, marker="o", color=color, linewidth=2, markersize=4)
+                # annotate path with agent id at start
+                if path:
+                    ax.text(cols[0] + 0.1, rows[0] + 0.1, f"A{aid}", color=color, fontsize=8, weight="bold")
+
+        ax.set_xlim(-0.5, self.width - 0.5)
+        ax.set_ylim(self.height - 0.5, -0.5)
+        ax.set_aspect("equal")
+        ax.set_xticks([])
+        ax.set_yticks([])
+        # Save a copy to the working directory for headless inspection
+        import os
+
+        out_path = os.path.join(os.getcwd(), "benchmark_plot.png")
+        try:
+            fig.tight_layout()
+            fig.savefig(out_path, dpi=150)
+            print(f"Saved plot to {out_path}")
+        except Exception as e:
+            warnings.warn(f"Failed to save plot to {out_path}: {e}")
+        plt.show()
 
     def in_bounds(self, pos: Position) -> bool:
         return 0 <= pos.row < self.height and 0 <= pos.col < self.width
@@ -278,6 +358,14 @@ class MAPFEnvironment:
         return dict(self.agent_positions), done, info
 
 
+    def render(self, starts: Optional[Dict[int, Position]] = None, goals: Optional[Dict[int, Position]] = None, paths: Optional[Dict[int, List[Position]]] = None, figsize: Tuple[int, int] = (6, 6)) -> None:
+        """Convenience render that delegates to GridMap.draw.
+
+        This lets users call `env.render(...)` to visualize the current map and optional paths.
+        """
+        self.grid_map.draw(starts=starts, goals=goals, paths=paths, figsize=figsize)
+
+
 def detect_conflicts(
     paths: Dict[int, List[Position]],
 ) -> List[Conflict]:
@@ -338,32 +426,3 @@ def detect_conflicts(
 
     return conflicts
 
-
-if __name__ == "__main__":
-    ascii_map = [
-        "#########",
-        "#S.....G#",
-        "#.###.#.#",
-        "#.....#.#",
-        "#########",
-    ]
-    grid = GridMap.from_ascii(ascii_map)
-
-    starts = {
-        0: Position(1, 1),
-    }
-    goals = {
-        0: Position(1, 7),
-    }
-
-    env = MAPFEnvironment(grid, starts, goals, max_time=20)
-    state = env.reset()
-    print("Initial state:", state)
-
-    for step in range(10):
-        state, done, info = env.step({0: 2})
-        print(f"\nTime {info['time']}")
-        print("State:", state)
-        print("At goal:", info["all_at_goal"])
-        if done:
-            break
