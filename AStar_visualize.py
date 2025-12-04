@@ -71,17 +71,7 @@ def visualize_paths(grid, starts, goals_list, paths):
                 if wrap_x or wrap_y:
                     if wrap_x and not wrap_y:
                         if dx > 0:
-                            ax.plot(
-                                [x1, cols - 0.5], [y1, y1],
-                                color=color, linewidth=linewidth,
-                                linestyle='--', alpha=alpha
-                            )
-                            ax.plot(
-                                [-0.5, x2], [y2, y2],
-                                color=color, linewidth=linewidth,
-                                linestyle='--', alpha=alpha
-                            )
-                        else:
+                            # Wrapping from right to left (e.g. 0 -> 7)
                             ax.plot(
                                 [x1, -0.5], [y1, y1],
                                 color=color, linewidth=linewidth,
@@ -92,20 +82,22 @@ def visualize_paths(grid, starts, goals_list, paths):
                                 color=color, linewidth=linewidth,
                                 linestyle='--', alpha=alpha
                             )
+                        else:
+                            # Wrapping from left to right (e.g. 7 -> 0)
+                            ax.plot(
+                                [x1, cols - 0.5], [y1, y1],
+                                color=color, linewidth=linewidth,
+                                linestyle='--', alpha=alpha
+                            )
+                            ax.plot(
+                                [-0.5, x2], [y2, y2],
+                                color=color, linewidth=linewidth,
+                                linestyle='--', alpha=alpha
+                            )
                     
                     elif wrap_y and not wrap_x:
                         if dy > 0:
-                            ax.plot(
-                                [x1, x1], [y1, rows - 0.5],
-                                color=color, linewidth=linewidth,
-                                linestyle='--', alpha=alpha
-                            )
-                            ax.plot(
-                                [x2, x2], [-0.5, y2],
-                                color=color, linewidth=linewidth,
-                                linestyle='--', alpha=alpha
-                            )
-                        else:
+                            # Wrapping from bottom to top (e.g. 0 -> 7)
                             ax.plot(
                                 [x1, x1], [y1, -0.5],
                                 color=color, linewidth=linewidth,
@@ -113,6 +105,18 @@ def visualize_paths(grid, starts, goals_list, paths):
                             )
                             ax.plot(
                                 [x2, x2], [rows - 0.5, y2],
+                                color=color, linewidth=linewidth,
+                                linestyle='--', alpha=alpha
+                            )
+                        else:
+                            # Wrapping from top to bottom (e.g. 7 -> 0)
+                            ax.plot(
+                                [x1, x1], [y1, rows - 0.5],
+                                color=color, linewidth=linewidth,
+                                linestyle='--', alpha=alpha
+                            )
+                            ax.plot(
+                                [x2, x2], [-0.5, y2],
                                 color=color, linewidth=linewidth,
                                 linestyle='--', alpha=alpha
                             )

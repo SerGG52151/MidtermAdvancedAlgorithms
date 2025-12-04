@@ -32,8 +32,13 @@ def run_example_three_services() -> None:
 
     # Define starts at the top in a line and goals at the bottom in a line
     # Agents start at row 0, goals at row 7 (bottom)
-    starts = [(0, 1), (0, 3), (0, 5)]  # Top row, spread across
+    starts = [(3, 1), (5, 3), (0, 5)]  # Top row, spread across
     goals_list = [
+        [(5, 1), (4, 5)],  # Agent 0: bottom left, center, right
+        [(6, 3), (1, 1)],  # Agent 1: bottom center, right, left
+        [(1, 5), (7, 1)],  # Agent 2: bottom right, left, center
+    ]
+    goals_listOG = [
         [(7, 1), (7, 3), (7, 5)],  # Agent 0: bottom left, center, right
         [(7, 3), (7, 5), (7, 1)],  # Agent 1: bottom center, right, left
         [(7, 5), (7, 1), (7, 3)],  # Agent 2: bottom right, left, center
