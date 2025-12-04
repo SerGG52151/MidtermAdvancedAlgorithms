@@ -1,0 +1,161 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{enumitem}
+
+\geometry{
+ a4paper,
+ total={170mm,257mm},
+ left=20mm,
+ top=20mm,
+}
+
+\title{Multi-Agent Pathfinding: Informed Search vs MARL Performance Evaluation}
+\author{Midterm Advanced Algorithms Project}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\textbf{Keywords:} Multi-agent Reinforcement Learning, Pathfinding, Heuristic search, A* optimization, Conflict-Based Search
+
+The goal of this project is to achieve a thorough evaluation of the performance of two distinct approaches for multi-agent pathfinding (MAPF): A* with Conflict-Based Search (CBS) and Multi-Agent Reinforcement Learning (MARL). CBS is a heuristic two-level search method that allows for efficient pathfinding and conflict resolution, guaranteeing optimality. In contrast, MARL utilizes a centralized Proximal Policy Optimization (PPO) agent to learn navigation policies. This project investigates to what extent a learning-based approach can compare in performance to a classical optimal solver on a toroidal grid environment.
+
+\textbf{Summarized Conclusions:} The proposed approach demonstrates that while CBS remains the gold standard for optimality and safety in complex scenarios, MARL offers a significant advantage in execution speed once trained. However, MARL struggles with long-horizon planning and requires extensive training (2M+ steps) and careful reward shaping to achieve collision-free navigation. The study highlights a trade-off between the computational cost of planning (CBS) and the training cost/sub-optimality of learning (MARL).
+\end{abstract}
+
+\section{Objectives}
+
+\subsection{Primary Objective}
+To conduct a comparative performance analysis of classical heuristic search (CBS) versus learning-based approaches (MARL) for the Multi-Agent Pathfinding problem, focusing on solution quality and computational efficiency.
+
+\subsection{Secondary Objectives}
+\begin{itemize}
+    \item Implement a robust CBS solver utilizing A* for low-level pathfinding on toroidal grids.
+    \item Develop and train a MARL agent using PPO with a centralized training, decentralized execution architecture.
+    \item Design an effective observation space using relative coordinates to improve learning convergence.
+    \item Evaluate both approaches on metrics of Makespan (total time steps) and Execution Time (inference vs. search).
+    \item Analyze the impact of reward shaping on the agent's ability to avoid vertex and edge conflicts.
+\end{itemize}
+
+\section{Problem Statement}
+
+\subsection{Context and Motivation}
+In logistics and robotics, autonomous agents must often navigate shared spaces to visit sequences of service locations. As the number of agents increases, avoiding collisions becomes computationally expensive. Traditional algorithms like A* scale poorly in the joint state space, necessitating decoupled approaches like CBS or learning-based methods like MARL.
+
+\subsection{Formal Specification}
+\begin{itemize}
+    \item \textbf{Input:} A toroidal grid graph $G=(V,E)$, a set of agents $A=\{a_1...a_n\}$, each with a start position $s_i$ and a sequence of goals $G_i$.
+    \item \textbf{Output:} A set of paths $P=\{p_1...p_n\}$ such that agent $i$ visits all goals in $G_i$ in order.
+    \item \textbf{Constraints:}
+    \begin{enumerate}
+        \item \textbf{Vertex Conflict:} No two agents can occupy vertex $v$ at time $t$.
+        \item \textbf{Edge Conflict:} No two agents can traverse the same edge in opposite directions at time $t$.
+        \item \textbf{Toroidal Geometry:} The grid wraps around edges (index 0 connects to index $N-1$).
+    \end{enumerate}
+    \item \textbf{Objective:} Minimize the Makespan (the time step when the last agent completes its task).
+\end{itemize}
+
+\section{Algorithm Design}
+
+\subsection{Approach 1: Conflict-Based Search (CBS)}
+\begin{itemize}
+    \item \textbf{Paradigm:} Two-level search.
+    \item \textbf{High-Level:} Searches a Constraint Tree (CT). Nodes represent sets of constraints. If a conflict is found in the current solution, the node splits into two children, each forbidding the move for one of the conflicting agents.
+    \item \textbf{Low-Level:} Runs A* search for individual agents to find the shortest path consistent with the constraints imposed by the high-level node.
+    \item \textbf{Key Feature:} Guarantees optimality by resolving conflicts only when they occur.
+\end{itemize}
+
+\subsection{Approach 2: Multi-Agent Reinforcement Learning (MARL)}
+\begin{itemize}
+    \item \textbf{Paradigm:} Centralized Training, Decentralized Execution (simulated via wrapper).
+    \item \textbf{Algorithm:} Proximal Policy Optimization (PPO).
+    \item \textbf{Observation Space:} A flattened vector of relative coordinates $(dx, dy)$ pointing to the current goal and to other agents. This translation-invariant representation aids generalization.
+    \item \textbf{Reward Function:}
+    \begin{itemize}
+        \item \textbf{Dense:} Improvement in Manhattan distance to goal ($+0.2 \times \Delta$).
+        \item \textbf{Sparse:} Large reward for completing a goal ($+20.0$).
+        \item \textbf{Penalty:} Heavy penalty for collisions ($-5.0$) and invalid moves ($-0.5$).
+    \end{itemize}
+\end{itemize}
+
+\section{Complexity Analysis}
+
+\subsection{Conflict-Based Search (CBS)}
+\begin{itemize}
+    \item \textbf{Time Complexity:} Worst-case is exponential. The high-level search is bounded by the number of conflicts. In the worst case, it explores a tree of depth proportional to the number of conflicts. Low-level A* is $O(b^d)$. Total: $O(N \cdot (b^d)^C)$.
+    \item \textbf{Space Complexity:} Exponential in the worst case (storing the Constraint Tree).
+    \item \textbf{Scalability:} Scales well with map size but poorly with agent density (more conflicts).
+\end{itemize}
+
+\subsection{Multi-Agent Reinforcement Learning (MARL)}
+\begin{itemize}
+    \item \textbf{Inference Time:} $O(1)$ per step (constant time matrix multiplications for the policy network). Total execution time is linear with path length $O(L)$.
+    \item \textbf{Training Time:} High. Requires millions of interactions with the environment to converge.
+    \item \textbf{Space Complexity:} Constant $O(W)$, determined by the size of the neural network weights.
+    \item \textbf{Scalability:} Inference remains fast regardless of complexity, but training stability decreases as agent count rises.
+\end{itemize}
+
+\section{Experimental Results}
+
+\subsection{Experimental Setup}
+\begin{itemize}
+    \item \textbf{Environment:} 8x8 Toroidal Grid.
+    \item \textbf{Agents:} 3 Agents with distinct start/goal sequences (Service $\rightarrow$ Home $\rightarrow$ Service).
+    \item \textbf{Hardware:} Standard CPU execution.
+    \item \textbf{Training:} PPO agent trained for 2,000,000 time steps.
+\end{itemize}
+
+\subsection{Performance Measurements}
+\begin{itemize}
+    \item \textbf{Makespan:} CBS consistently finds the optimal path (e.g., $\sim 20-30$ steps). MARL paths are typically 20-50\% longer due to hesitant behavior or sub-optimal routing.
+    \item \textbf{Execution Time:} CBS search time varies significantly based on conflict density (0.01s to $>1$s). MARL inference is near-instantaneous ($<0.001$s) once trained.
+\end{itemize}
+
+\subsection{Key Observations}
+\begin{itemize}
+    \item MARL agents initially struggle with ``sparse rewards'' (finding the goal by chance) but improve significantly with distance-based reward shaping.
+    \item Using relative coordinates $(dx, dy)$ instead of absolute $(x, y)$ was critical for the MARL agent to learn valid navigation policies on the toroidal grid.
+    \item CBS guarantees 0 collisions, whereas MARL requires strict penalties to learn safety.
+\end{itemize}
+
+\section{Conclusions}
+This research successfully implemented and compared CBS and MARL for the MAPF problem.
+\begin{itemize}
+    \item CBS is the superior choice for applications requiring guaranteed safety and optimality, such as air traffic control or warehouse automation, provided the agent density is manageable.
+    \item MARL is a promising alternative for real-time, resource-constrained applications where sub-optimality is acceptable in exchange for constant-time decision making.
+    \item Future work includes implementing ``Guided CBS'' (using the MARL policy as a heuristic for CBS) and exploring Graph Neural Networks (GNNs) to better capture grid topology.
+\end{itemize}
+
+\begin{thebibliography}{9}
+
+\bibitem{sharon2015}
+Sharon, G., Stern, R., Felner, A., \& Sturtevant, N. R. (2015).
+\textit{Conflict-based search for optimal multi-agent pathfinding}.
+Artificial Intelligence, 219, 40-66.
+
+\bibitem{schulman2017}
+Schulman, J., Wolski, F., Dhariwal, P., Radford, A., \& Klimov, O. (2017).
+\textit{Proximal policy optimization algorithms}.
+arXiv preprint arXiv:1707.06347.
+
+\bibitem{silver2005}
+Silver, D. (2005).
+\textit{Cooperative Pathfinding}.
+AIIDE, 117-122.
+
+\bibitem{ma2017}
+Ma, H., \& Koenig, S. (2017).
+\textit{AI buzzwords explained: Multi-agent path finding (MAPF)}.
+AI Matters, 3(4), 15-19.
+
+\end{thebibliography}
+
+\end{document}

@@ -51,6 +51,14 @@ def visualize_paths(grid, starts, goals_list, paths):
             if not found_goal:
                 break
         
+        # Fallback: If no segments were found (agent didn't complete any goals),
+        # or if we want to see the tail of the path, just draw the whole path if it's empty.
+        # Better yet: If we have segments, great. If we have leftover path at the end, add it?
+        # For now, let's just ensure that if nothing was found, we draw the full path 
+        # so we can see what the MARL agent did.
+        if not path_segments and len(full_path) > 1:
+            path_segments.append(full_path)
+        
         for seg_idx, segment in enumerate(path_segments):
             alpha = max(0.4, 0.9 - (seg_idx * 0.15))
             linewidth = max(1.4, 2.8 - (seg_idx * 0.3))
