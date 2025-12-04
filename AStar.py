@@ -106,37 +106,44 @@ def _astar_single_goal(
     return None
 
 
+
 def a_star_search(
     start: Tuple[int, int],
-    goals: List[Tuple[int, int]],
+    goals: List[Tuple[int, int]],  # Lista de waypoints en orden
     grid: List[List[int]],
     constraints: Set[Constraint],
     agent_id: int,
-    max_time: int = 500
+    max_time: int = 1000  # Aumentado para mapas grandes
 ) -> Optional[List[Tuple[int, int]]]:
-    """Multi-goal A* search. Agent visits each goal then returns to start."""
+    """
+    Busca camino secuencial a través de múltiples waypoints.
+    No regresa al inicio entre waypoints.
+    """
     if not goals:
         return [start]
     
     complete_path = []
+    current_pos = start
     current_time = 0
     
-    for goal_idx, goal in enumerate(goals):
-        # Find path to goal
-        path_to_goal = _astar_single_goal(start, goal, current_time, grid, constraints, agent_id, max_time)
-        if not path_to_goal:
+    for goal in goals:
+        # Buscar camino al siguiente waypoint
+        segment = _astar_single_goal(
+            current_pos, goal, current_time, 
+            grid, constraints, agent_id, max_time
+        )
+        
+        if segment is None:
             return None
         
-        # Append, avoiding duplicate positions
-        complete_path.extend(path_to_goal if goal_idx == 0 else path_to_goal[1:])
-        current_time = len(complete_path) - 1
+        # Concatenar, evitando duplicar posición inicial
+        if complete_path:
+            complete_path.extend(segment[1:])  # Excluir primera posición (ya está)
+        else:
+            complete_path.extend(segment)
         
-        # Find path back to start
-        path_to_start = _astar_single_goal(goal, start, current_time, grid, constraints, agent_id, max_time)
-        if not path_to_start:
-            return None
-        
-        complete_path.extend(path_to_start[1:])
+        # Actualizar para siguiente waypoint
+        current_pos = goal
         current_time = len(complete_path) - 1
     
     return complete_path
