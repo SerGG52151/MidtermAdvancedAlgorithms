@@ -27,8 +27,8 @@ class Conflict:
 
 @dataclass(order=True)
 class CTNode:
-    num_conflicts: int = field(compare=True)
     cost: int = field(compare=True)
+    num_conflicts: int = field(compare=True)
     makespan: int = field(compare=False)
     constraints: Set[Constraint] = field(default_factory=set, compare=False)
     solution: Dict[int, List[Tuple[int, int]]] = field(default_factory=dict, compare=False)
@@ -51,16 +51,35 @@ def get_toroidal_neighbors(pos: Tuple[int, int], grid: List[List[int]]) -> List[
     return [n for n in neighbors if grid[n[0]][n[1]] == 0]
 
 
-def violates_constraint(agent_id: int, from_pos: Tuple[int, int], to_pos: Tuple[int, int],
-                       time: int, constraints: Set[Constraint]) -> bool:
-    """Check if move violates any constraint."""
+def build_reservation_table(constraints: Set[Constraint], agent_id: int) -> Dict[Tuple[int, Tuple[int, int]], bool]:
+    """Build space-time reservation table for O(1) constraint checking.
+    
+    Returns:
+        Dict mapping (time, position) -> True for vertex constraints
+        and (time, (from_pos, to_pos)) -> True for edge constraints
+    """
+    table = {}
     for c in constraints:
-        if c.agent_id != agent_id or c.time != time:
+        if c.agent_id != agent_id:
             continue
-        if c.position and c.position == to_pos:
-            return True
-        if c.from_position and c.to_position and c.from_position == from_pos and c.to_position == to_pos:
-            return True
+        # Vertex constraint: can't be at position at time
+        if c.position:
+            table[(c.time, c.position)] = True
+        # Edge constraint: can't move from->to at time
+        if c.from_position and c.to_position:
+            table[(c.time, (c.from_position, c.to_position))] = True
+    return table
+
+
+def violates_constraint_table(from_pos: Tuple[int, int], to_pos: Tuple[int, int],
+                              time: int, reservation_table: Dict) -> bool:
+    """Check if move violates any constraint using reservation table (O(1))."""
+    # Check vertex constraint
+    if (time, to_pos) in reservation_table:
+        return True
+    # Check edge constraint
+    if (time, (from_pos, to_pos)) in reservation_table:
+        return True
     return False
 
 
@@ -74,6 +93,9 @@ def _astar_single_goal(
     max_time: int = 500
 ) -> Optional[List[Tuple[int, int]]]:
     """A* search from start to goal with constraints."""
+    # Build space-time reservation table for O(1) constraint checking
+    reservation_table = build_reservation_table(constraints, agent_id)
+    
     open_set = [(toroidal_distance(start_pos, goal_pos, grid), 0, start_time, start_pos, [start_pos])]
     closed_set = set()
     best_g = {(start_time, start_pos): 0}
@@ -91,7 +113,7 @@ def _astar_single_goal(
         
         for next_pos in get_toroidal_neighbors(pos, grid):
             next_time = time + 1
-            if violates_constraint(agent_id, pos, next_pos, next_time, constraints):
+            if violates_constraint_table(pos, next_pos, next_time, reservation_table):
                 continue
             
             tentative_g = time - start_time + 1
@@ -225,8 +247,8 @@ def find_multi_goal_paths(
         print(f"Initial solution has {len(root_conflicts)} conflicts, cost={root_cost}, makespan={root_makespan}")
     
     root_node = CTNode(
-        num_conflicts=len(root_conflicts),
         cost=root_cost,
+        num_conflicts=len(root_conflicts),
         makespan=root_makespan,
         constraints=root_constraints,
         solution=root_solution,
@@ -279,8 +301,8 @@ def find_multi_goal_paths(
             child_makespan = max(len(path) for path in child_solution.values())
             
             child_node = CTNode(
-                num_conflicts=len(child_conflicts),
                 cost=child_cost,
+                num_conflicts=len(child_conflicts),
                 makespan=child_makespan,
                 constraints=child_constraints,
                 solution=child_solution,
