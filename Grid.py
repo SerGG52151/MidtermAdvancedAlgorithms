@@ -244,19 +244,45 @@ class MAPFEnvironment:
         self,
         grid_map: GridMap,
         starts: Dict[int, Position],
-        goals: Dict[int, Position],
+        goals_list: Dict[int, List[Position]],
         max_time: Optional[int] = None,
     ) -> None:
         self.grid_map = grid_map
         self.starts = dict(starts)
-        self.goals = dict(goals)
+        self.goals_list = dict(goals_list)
         self.max_time = max_time
         self.time: int = 0
         self.agent_positions: Dict[int, Position] = dict(starts)
+        
+        # Track current goal index for each agent
+        self.agent_goal_indices: Dict[int, int] = {aid: 0 for aid in starts}
+        # Track if agent has finished all goals
+        self.agent_finished: Dict[int, bool] = {aid: False for aid in starts}
+        # Current active goal for each agent
+        self.current_goals: Dict[int, Position] = {}
+        self._update_current_goals()
+
+    def _update_current_goals(self):
+        for aid in self.starts:
+            if self.agent_finished[aid]:
+                self.current_goals[aid] = self.agent_positions[aid] # Stay put
+                continue
+                
+            goals = self.goals_list[aid]
+            idx = self.agent_goal_indices[aid]
+            
+            if idx < len(goals):
+                self.current_goals[aid] = goals[idx]
+            else:
+                self.agent_finished[aid] = True
+                self.current_goals[aid] = self.agent_positions[aid]
 
     def reset(self) -> Dict[int, Position]:
         self.time = 0
         self.agent_positions = dict(self.starts)
+        self.agent_goal_indices = {aid: 0 for aid in self.starts}
+        self.agent_finished = {aid: False for aid in self.starts}
+        self._update_current_goals()
         return dict(self.agent_positions)
 
     def successors_for_agent(
@@ -341,9 +367,14 @@ class MAPFEnvironment:
         self.agent_positions = proposed_positions
         self.time += 1
 
-        all_at_goal = all(
-            self.agent_positions[a] == self.goals[a] for a in self.agent_positions
-        )
+        # Check for goal completion
+        for aid, pos in self.agent_positions.items():
+            if not self.agent_finished[aid]:
+                if pos == self.current_goals[aid]:
+                    self.agent_goal_indices[aid] += 1
+                    self._update_current_goals()
+
+        all_at_goal = all(self.agent_finished.values())
         time_limit_reached = self.max_time is not None and self.time >= self.max_time
         done = all_at_goal or time_limit_reached
 
@@ -353,6 +384,7 @@ class MAPFEnvironment:
             "edge_conflicts": edge_conflicts,
             "all_at_goal": all_at_goal,
             "time_limit_reached": time_limit_reached,
+            "agent_finished": self.agent_finished
         }
 
         return dict(self.agent_positions), done, info

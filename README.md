@@ -1,65 +1,88 @@
-# Multi-Agent Pathfinding on Toroidal Grid
+# Multi-Agent Pathfinding: Informed Search vs. MARL Performance Evaluation
 
-This project implements a Conflict-Based Search (CBS) algorithm combined with A* search to solve Multi-Agent Pathfinding (MAPF) problems on a toroidal grid. Agents are tasked with visiting multiple service locations in a specific sequence and returning to their start position after each service, all while avoiding collisions with other agents.
+This project presents a comparative evaluation of two distinct approaches to solving the Multi-Agent Pathfinding (MAPF) problem on a toroidal grid: **Conflict-Based Search (CBS)** and **Multi-Agent Reinforcement Learning (MARL)**.
 
-## Project Structure
+## 1. Context and Motivation
 
-- **`AStar.py`**: The core implementation of the pathfinding logic. It includes:
-    - `a_star_search`: A* search algorithm adapted for toroidal grids and dynamic constraints.
-    - `find_multi_goal_paths`: The main CBS loop that resolves conflicts between agents.
-    - `detect_conflicts`: Identifies vertex and edge conflicts between agent paths.
-    - `Constraint` and `Conflict` data structures.
+Pathfinding for multiple agents in shared environments is a fundamental challenge in robotics, automated warehousing, and traffic management. As the number of agents increases, the state space grows exponentially, making the search for an optimal solution computationally expensive (NP-Hard).
 
-- **`AStar_visualize.py`**: Handles the visualization of the results using `matplotlib`.
-    - `visualize_paths`: Draws the grid, agents, goals, and paths. It specifically handles the visual representation of paths wrapping around the toroidal grid edges.
+In logistics and robotics, autonomous agents must often navi-
+gate shared spaces to visit sequences of locations. Traditional
+algorithms like A* scale poorly in the joint state space, requir-
+ing decoupled approaches like CBS or learning-based methods
+like MARL.
 
-- **`benchmark.py`**: An example script that sets up a specific scenario ("Three Services Problem") and runs the solver.
-    - Defines the grid size, obstacles (if any), agent start positions, and sequences of goals.
-    - Runs the `find_multi_goal_paths` function.
-    - Prints performance metrics and path details.
-    - Visualizes the solution.
+## 2. Research Hypothesis
 
-- **`Grid.py`**: Contains helper classes and data structures for grid management, environment simulation, and alternative definitions for positions and constraints. (Note: `AStar.py` currently uses its own internal definitions for some of these, but this file provides a structured environment model).
+**Guiding Question:** To what extent can a decentralized Multi-Agent Reinforcement Learning (MARL) approach approximate the solution quality (makespan) and execution time of an optimal Conflict-Based Search (CBS) solver?
 
-## Features
+**Hypothesis:** While CBS will reliably provide an optimal path with no collisions, its computation time will degrade significantly with complexity. Conversely, a trained MARL agent will exhibit near-instantaneous execution times (O(1) inference) but may produce suboptimal paths or fail to converge in highly constrained scenarios.
 
-- **Toroidal Grid**: The grid wraps around at the edges (top connects to bottom, left connects to right).
-- **Multi-Goal Support**: Agents can be assigned a list of goals to visit in order. The current implementation models this as a series of round trips (Start -> Goal -> Start).
-- **Conflict-Based Search (CBS)**: A two-level algorithm that finds optimal collision-free paths.
-- **Visualization**: Visual output of the paths, including indicators for start positions, service locations, and wrapped path segments.
+## 3. Algorithmic Justification
 
-## Requirements
+### Approach A: Conflict-Based Search (CBS)
+*   **Justification:** CBS is the an algorithm for optimal MAPF. It decomposes the problem into a high-level search (resolving conflicts between agents) and a low-level search (planning individual paths).
+*   **Mechanism:** It guarantees optimality by exploring a constraint tree. If Agent A and Agent B collide at time *t*, the search splits: one branch forbids Agent A from being there, the other forbids Agent B.
 
-To run this project, you need Python installed along with the following libraries:
+### Approach B: Multi-Agent Reinforcement Learning (MARL)
+*   **Justification:** Learning-based methods shift the computational burden from "execution time" to "training time." Once trained, an agent acts based on a policy function, requiring no search tree exploration during runtime.
+*   **Mechanism:** We utilize **Proximal Policy Optimization (PPO)** with a centralized critic and decentralized actors. Agents observe their local surroundings (relative goal position, nearby obstacles) and learn a policy $\pi(a|s)$ to maximize a reward signal based on reaching goals and avoiding collisions.
 
-- `numpy`
-- `matplotlib`
+## 4. System Architecture
 
-You can install them using pip:
+The project is structured into modular components separating the environment, the solvers, and the evaluation logic.
 
+*   **`Grid.py`**: The core environment model. It handles the grid state, obstacle definitions, and the toroidal wrapping logic. 
+*   **`AStar.py`**: Implements the Classical Solver.
+    *   Contains the Low-Level Solver (Space-Time A*).
+    *   Contains the High-Level Solver (CBS Constraint Tree).
+*   **`train_marl.py`**: The training pipeline for the Learning Solver.
+    *   Sets up the PPO model using `stable-baselines3`.
+    *   Manages the training loop and model saving.
+*   **`gym_wrapper.py`**: The bridge between the `Grid` environment and the RL agent.
+    *   Converts grid states into tensor observations (relative coordinates).
+    *   Defines the reward function (penalties for collisions, rewards for goals).
+*   **`benchmark_comparison.py`**: The evaluation engine.
+    *   Runs both solvers on the exact same scenario.
+    *   Visualizes paths side-by-side.
+    *   Generates comparative metrics (Makespan vs. Execution Time).
+
+## 5. Data Structures and Algorithms
+
+### Implemented Data Structures
+1.  **Priority Queue (Min-Heap):** Used in `AStar.py` for the Open Set to efficiently retrieve the node with the lowest f-score.
+2.  **Constraint Tree:** A binary tree used in CBS where each node represents a set of constraints imposed on agents to resolve specific collisions.
+3.  **Spatio-Temporal Grid:** The A* search operates not just on $(x, y)$ but on $(x, y, t)$, treating time as a third dimension to avoid dynamic obstacles.
+4.  **Observation Vector:** In MARL, the grid is flattened into a vector representing relative distances $(dx, dy)$ to goals and neighbors, normalized for neural network input.
+
+### Algorithms
+1.  **A* Search (Toroidal):** Modified to handle "wrapping" edges (e.g., moving right from $x=7$ leads to $x=0$).
+2.  **Conflict Detection:** An algorithm that iterates through generated paths to find vertex conflicts ($A$ and $B$ are at $v$ at time $t$) and edge conflicts ($A$ and $B$ swap vertices).
+3.  **Proximal Policy Optimization (PPO):** A policy gradient method that optimizes the agents' neural network weights by clipping updates to ensure stable learning.
+
+## 6. Requirements & Usage
+
+### Prerequisites
+*   Python 3.8+
+*   `numpy`, `matplotlib`
+*   `gymnasium`, `stable-baselines3`, `shimmy`
+
+### Installation
 ```bash
-pip install numpy matplotlib
+pip install numpy matplotlib gymnasium stable-baselines3 shimmy
 ```
 
-## Usage
+### Running the Comparison
+To perform the full evaluation (Training -> Solving -> Comparing):
 
-To run the example scenario defined in `benchmark.py`:
+1.  **Train the MARL Agent:**
+    ```bash
+    python train_marl.py
+    ```
+    *(This saves the trained model to `ppo_marl_agent.zip`)*
 
-```bash
-python benchmark.py
-```
-
-This will:
-1.  Initialize the grid and agent tasks.
-2.  Run the CBS solver to find collision-free paths.
-3.  Print the paths and statistics to the console.
-4.  Open a window showing the visualization of the agents' movements.
-
-## How it Works
-
-1.  **Low-Level Search (A*)**: Finds the optimal path for a single agent respecting a set of spatiotemporal constraints (e.g., "Agent 1 cannot be at (x,y) at time t").
-2.  **High-Level Search (CBS)**:
-    - Checks the paths found by the low-level search for conflicts (collisions).
-    - If a conflict is found (e.g., two agents at the same location at the same time), it splits the search into two branches.
-    - In each branch, a constraint is added to prevent one of the agents from using that location at that time, and the low-level search is re-run for that agent.
-    - This process continues until a set of conflict-free paths is found.
+2.  **Run the Benchmark:**
+    ```bash
+    python benchmark_comparison.py
+    ```
+    *(This generates the comparison plot and visualizes both solutions)*
