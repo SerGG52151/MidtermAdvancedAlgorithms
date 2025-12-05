@@ -31,7 +31,7 @@ def run_cbs_benchmark(grid_data, starts, goals_list):
         print("CBS Failed to find solution")
         return {"success": False, "makespan": 0, "steps": 0, "time": duration, "paths": {}}
 
-def run_marl_benchmark(grid_map, starts_list, goals_list_raw, model_path="ppo_marl_agent_2"):
+def run_marl_benchmark(grid_map, starts_list, goals_list_raw, model_path="ppo_marl_agent"):
     print("\n--- Running MARL Benchmark ---")
     
     starts = {i: Position(r, c) for i, (r, c) in enumerate(starts_list)}
@@ -101,9 +101,9 @@ def main():
     
     starts_list = [(3, 1), (5, 3), (0, 5)]
     goals_list_raw = [
-        [(5, 1), (4, 5)],  # Agent 0
-        [(6, 3), (1, 1)],  # Agent 1
-        [(1, 5), (7, 1)],  # Agent 2
+        [(5, 1), (4, 5), (6, 7)],  # Agent 0 
+        [(6, 3), (1, 1), (7, 4)],  # Agent 1 
+        [(1, 5), (7, 1), (5, 3)],  # Agent 2
     ]
     
     # Run CBS

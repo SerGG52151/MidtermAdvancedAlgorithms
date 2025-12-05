@@ -21,9 +21,6 @@ class CentralizedMAPFWrapper(gym.Env):
         # OBSERVATION SPACE:
         # We use relative coordinates (dx, dy) to target and to other agents.
         # This is translation invariant and helps generalization.
-        # For each agent:
-        # [target_dx, target_dy] (2 values)
-        # + [other_agent_dx, other_agent_dy] for each other agent (2 * (num_agents - 1) values)
         
         self.H = env.grid_map.height
         self.W = env.grid_map.width
